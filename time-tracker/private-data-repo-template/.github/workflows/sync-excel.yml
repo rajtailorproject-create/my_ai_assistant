@@ -1,0 +1,39 @@
+name: Sync password-protected Excel
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '13 4 * * *'
+permissions:
+  contents: write
+concurrency:
+  group: yearly-excel-export
+  cancel-in-progress: false
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r time-tracker/private-data-repo-template/requirements.txt
+      - name: Build encrypted Excel workbooks
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OWNER_USER_ID: ${{ secrets.OWNER_USER_ID }}
+          EXCEL_PASSWORD: ${{ secrets.EXCEL_PASSWORD }}
+        run: python time-tracker/private-data-repo-template/scripts/export_excel.py
+      - name: Commit encrypted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if ! git diff --cached --quiet; then
+            git commit -m "Sync password-protected yearly Excel files"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          else
+            echo "No updates"
+          fi

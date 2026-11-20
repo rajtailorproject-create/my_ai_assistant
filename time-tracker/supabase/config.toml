@@ -1,0 +1,3 @@
+[functions.log-activity]
+# The function checks JWT using auth.getUser(token) and OWNER_USER_ID.
+verify_jwt = false
