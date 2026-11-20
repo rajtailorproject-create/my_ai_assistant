@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Activity Tracker</title>
+<style>
+  :root {
+    --bg: #f4f5f9;
+    --card: #ffffff;
+    --text: #1b1d26;
+    --muted: #6b7080;
+    --border: #e4e6ee;
+    --track: #e9ebf3;
+    --shadow: 0 1px 3px rgba(20,22,40,.06), 0 6px 20px rgba(20,22,40,.05);
+    --meditation: #8b5cf6;
+    --gym: #f97316;
+    --reading: #10b981;
+    --danger: #e5484d;
+    --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1117;
+      --card: #181b24;
+      --text: #eceef5;
+      --muted: #8b90a3;
+      --border: #272b38;
+      --track: #262a37;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 1.6rem; letter-spacing: -.02em; }
+  .date { color: var(--muted); font-size: .95rem; }
+  h2 { margin: 0 0 14px; font-size: 1.05rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+
+  /* Activity cards */
+  .act { position: relative; overflow: hidden; }
+  .act::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 4px; background: var(--c); }
+  .act-head { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .act-head .icon { font-size: 1.3rem; }
+  .total { font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 0; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--muted); font-size: .85rem; min-height: 1.2em; }
+  .timer {
+    font-variant-numeric: tabular-nums;
+    font-size: 1.1rem;
+    margin: 12px 0;
+    color: var(--muted);
+  }
+  .timer.running { color: var(--c); font-weight: 600; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-weight: 600;
+    transition: transform .06s, opacity .15s;
+  }
+  button:active { transform: scale(.97); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--c, var(--meditation)); outline-offset: 2px; }
+  .btn-timer { width: 100%; background: var(--c); color: #fff; }
+  .btn-timer.stop { background: var(--danger); }
+  .btn-primary { background: var(--text); color: var(--bg); }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 6px 12px; font-size: .85rem; }
+  .btn-ghost:hover { color: var(--danger); border-color: var(--danger); }
+
+  /* Form */
+  form { display: grid; gap: 12px; }
+  label { display: grid; gap: 6px; font-size: .85rem; color: var(--muted); font-weight: 500; }
+  input, select {
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    width: 100%;
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .msg { font-size: .85rem; color: var(--reading); min-height: 1.2em; }
+
+  /* Weekly progress */
+  .prog { margin-bottom: 16px; }
+  .prog-top { display: flex; justify-content: space-between; align-items: center; font-size: .9rem; margin-bottom: 6px; gap: 8px; }
+  .prog-top .name { font-weight: 600; display: flex; gap: 6px; align-items: center; }
+  .bar { height: 10px; background: var(--track); border-radius: 99px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--c); border-radius: 99px; transition: width .4s ease; }
+  .goal-edit { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: .8rem; }
+  .goal-edit input { width: 68px; padding: 4px 6px; font-size: .8rem; border-radius: 8px; }
+
+  /* Chart */
+  .chart { display: flex; align-items: flex-end; gap: 8px; height: 170px; margin-top: 6px; }
+  .col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; min-width: 0; }
+  .col .stack { flex: 1; width: 100%; max-width: 40px; display: flex; flex-direction: column-reverse; border-radius: 8px; overflow: hidden; background: var(--track); }
+  .col .seg { width: 100%; }
+  .col .lbl { font-size: .75rem; color: var(--muted); margin-top: 6px; }
+  .col.today .lbl { color: var(--text); font-weight: 700; }
+  .col .val { font-size: .7rem; color: var(--muted); height: 1.1em; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: .8rem; color: var(--muted); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+
+  /* History */
+  .hist-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .hist-head h2 { margin: 0; }
+  .day-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 6px; font-weight: 600; }
+  .item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .item:last-child { border-bottom: 0; }
+  .item .pill { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+  .item .name { flex: 1; font-weight: 500; }
+  .item .meta { color: var(--muted); font-size: .8rem; }
+  .item .dur { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .item .del { background: none; color: var(--muted); padding: 4px 8px; font-size: 1.1rem; line-height: 1; }
+  .item .del:hover { color: var(--danger); }
+  .empty { color: var(--muted); text-align: center; padding: 24px 0; }
+
+  @media (max-width: 800px) {
+    .grid3, .grid2 { grid-template-columns: 1fr; }
+    .total { font-size: 1.8rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Activity Tracker</h1>
+      <div class="date" id="todayLabel"></div>
+    </div>
+  </header>
+
+  <!-- Today's totals + timers -->
+  <section class="grid3" id="activityCards"></section>
+
+  <section class="grid2">
+    <!-- Manual entry -->
+    <div class="card">
+      <h2>Add time manually</h2>
+      <form id="manualForm">
+        <label>Activity
+          <select id="mCat"></select>
+        </label>
+        <div class="row">
+          <label>Minutes
+            <input id="mMin" type="number" min="1" max="1440" step="1" placeholder="e.g. 25" required inputmode="numeric">
+          </label>
+          <label>Date
+            <input id="mDate" type="date" required>
+          </label>
+        </div>
+        <button type="submit" class="btn-primary">Add entry</button>
+        <div class="msg" id="formMsg" role="status"></div>
+      </form>
+    </div>
+
+    <!-- Weekly progress -->
+    <div class="card">
+      <h2>This week <span class="sub" id="weekRange"></span></h2>
+      <div id="weeklyProgress"></div>
+    </div>
+  </section>
+
+  <!-- Chart -->
+  <section class="card" style="margin-bottom:14px">
+    <h2>Last 7 days</h2>
+    <div class="chart" id="chart"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- History -->
+  <section class="card">
+    <div class="hist-head">
+      <h2>History</h2>
+      <button class="btn-ghost" id="clearAll">Clear all</button>
+    </div>
+    <div id="history"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const CATS = {
+    meditation: { label: 'Meditation', icon: '🧘', color: 'var(--meditation)', defaultGoal: 140 },
+    gym:        { label: 'Gym',        icon: '🏋️', color: 'var(--gym)',        defaultGoal: 180 },
+    reading:    { label: 'Reading',    icon: '📖', color: 'var(--reading)',    defaultGoal: 210 }
+  };
+  const KEYS = Object.keys(CATS);
+  const STORE = 'activityTracker.v1';
+
+  // ---------- State ----------
+  let state = load();
+
+  function load() {
+    const fresh = { entries: [], timers: {}, goals: {} };
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORE));
+      if (raw && typeof raw === 'object') {
+        return {
+          entries: Array.isArray(raw.entries) ? raw.entries : [],
+          timers: raw.timers && typeof raw.timers === 'object' ? raw.timers : {},
+          goals: raw.goals && typeof raw.goals === 'object' ? raw.goals : {}
+        };
+      }
+    } catch (e) {}
+    return fresh;
+  }
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
+  }
+
+  // ---------- Helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, '0');
+  function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function todayKey() { return dateKey(new Date()); }
+  function parseKey(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
+  function fmt(sec) {
+    const m = Math.floor(sec / 60), h = Math.floor(m / 60);
+    return h ? h + 'h ' + pad(m % 60) + 'm' : m + 'm';
+  }
+  function fmtClock(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return (h ? pad(h) + ':' : '') + pad(m) + ':' + pad(s);
+  }
+  function goalFor(cat) {
+    const g = Number(state.goals[cat]);
+    return g > 0 ? g : CATS[cat].defaultGoal;
+  }
+  function weekDays() {
+    const now = new Date();
+    const mondayOffset = (now.getDay() + 6) % 7;
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset);
+    return Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+  }
+  function last7Days() {
+    const now = new Date();
+    return Array.from({ length: 7 }, (_, i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i));
+  }
+  function sumBy(dateKeys, cat) {
+    const set = new Set(dateKeys);
+    return state.entries
+      .filter(e => set.has(e.date) && (!cat || e.cat === cat))
+      .reduce((a, e) => a + e.seconds, 0);
+  }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function addEntry(cat, seconds, date) {
+    state.entries.push({ id: uid(), cat, seconds: Math.round(seconds), date, ts: Date.now() });
+    save();
+  }
+
+  // ---------- Timers ----------
+  function toggleTimer(cat) {
+    const started = state.timers[cat];
+    if (started) {
+      const elapsed = (Date.now() - started) / 1000;
+      delete state.timers[cat];
+      if (elapsed >= 1) addEntry(cat, elapsed, dateKey(new Date(started)));
+      save();
+    } else {
+      state.timers[cat] = Date.now();
+      save();
+    }
+    renderAll();
+  }
+
+  // ---------- Render ----------
+  function renderCards() {
+    const today = todayKey();
+    $('activityCards').innerHTML = KEYS.map(k => {
+      const c = CATS[k];
+      const running = !!state.timers[k];
+      return `
+        <div class="card act" style="--c:${c.color}">
+          <div class="act-head"><span class="icon">${c.icon}</span>${c.label}</div>
+          <div class="total" id="total-${k}">0m</div>
+          <div class="sub">today</div>
+          <div class="timer ${running ? 'running' : ''}" id="timer-${k}">${running ? fmtClock((Date.now() - state.timers[k]) / 1000) : 'Timer stopped'}</div>
+          <button class="btn-timer ${running ? 'stop' : ''}" data-timer="${k}">${running ? '■ Stop' : '▶ Start'}</button>
+        </div>`;
+    }).join('');
+    updateLive();
+  }
+
+  // Update only the ticking numbers (called every second)
+  function updateLive() {
+    const today = todayKey();
+    KEYS.forEach(k => {
+      const saved = sumBy([today], k);
+      const live = state.timers[k] ? (Date.now() - state.timers[k]) / 1000 : 0;
+      const t = $('total-' + k);
+      if (t) t.textContent = fmt(saved + live);
+      const tm = $('timer-' + k);
+      if (tm && state.timers[k]) tm.textContent = fmtClock(live);
+    });
+  }
+
+  function renderWeekly() {
+    const days = weekDays();
+    const keys = days.map(dateKey);
+    const opts = { month: 'short', day: 'numeric' };
+    $('weekRange').textContent = '· ' + days[0].toLocaleDateString(undefined, opts) + ' – ' + days[6].toLocaleDateString(undefined, opts);
+    $('weeklyProgress').innerHTML = KEYS.map(k => {
+      const c = CATS[k];
+      const mins = Math.floor(sumBy(keys, k) / 60);
+      const goal = goalFor(k);
+      const pct = Math.min(100, Math.round((mins / goal) * 100));
+      return `
+        <div class="prog" style="--c:${c.color}">
+          <div class="prog-top">
+            <span class="name">${c.icon} ${c.label}</span>
+            <span>${fmt(mins * 60)} / <span class="goal-edit"><input type="number" min="1" max="10080" value="${goal}" data-goal="${k}" aria-label="${c.label} weekly goal in minutes"> min</span></span>
+          </div>
+          <div class="bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><div style="width:${pct}%"></div></div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderChart() {
+    const days = last7Days();
+    const todayK = todayKey();
+    const totals = days.map(d => {
+      const key = dateKey(d);
+      const per = KEYS.map(k => sumBy([key], k));
+      return { d, key, per, total: per.reduce((a, b) => a + b, 0) };
+    });
+    const max = Math.max(3600, ...totals.map(t => t.total)); // at least 60 min scale
+    $('chart').innerHTML = totals.map(t => {
+      const segs = KEYS.map((k, i) =>
+        t.per[i] ? `<div class="seg" style="height:${(t.per[i] / max) * 100}%;background:${CATS[k].color}" title="${CATS[k].label}: ${fmt(t.per[i])}"></div>` : ''
+      ).join('');
+      return `
+        <div class="col ${t.key === todayK ? 'today' : ''}">
+          <div class="val">${t.total ? Math.floor(t.total / 60) : ''}</div>
+          <div class="stack">${segs}</div>
+          <div class="lbl">${t.d.toLocaleDateString(undefined, { weekday: 'short' })}</div>
+        </div>`;
+    }).join('');
+    $('legend').innerHTML = KEYS.map(k => `<span><span class="dot" style="background:${CATS[k].color}"></span>${CATS[k].label}</span>`).join('') + '<span>· numbers are minutes</span>';
+  }
+
+  function renderHistory() {
+    const list = state.entries.slice().sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts).slice(0, 60);
+    if (!list.length) {
+      $('history').innerHTML = '<div class="empty">No entries yet. Start a timer or add time manually.</div>';
+      return;
+    }
+    const today = todayKey();
+    const yest = dateKey(new Date(Date.now() - 86400000));
+    let html = '', lastDate = '';
+    list.forEach(e => {
+      if (e.date !== lastDate) {
+        lastDate = e.date;
+        const label = e.date === today ? 'Today' : e.date === yest ? 'Yesterday'
+          : parseKey(e.date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+        html += `<div class="day-label">${label}</div>`;
+      }
+      const c = CATS[e.cat];
+      if (!c) return;
+      const time = new Date(e.ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+      html += `
+        <div class="item" style="--c:${c.color}">
+          <span class="pill"></span>
+          <span class="name">${c.label}<div class="meta">logged ${time}</div></span>
+          <span class="dur">${fmt(e.seconds)}</span>
+          <button class="del" data-del="${e.id}" aria-label="Delete entry" title="Delete">×</button>
+        </div>`;
+    });
+    $('history').innerHTML = html;
+  }
+
+  function renderAll() {
+    $('todayLabel').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    renderCards();
+    renderWeekly();
+    renderChart();
+    renderHistory();
+  }
+
+  // ---------- Events ----------
+  $('activityCards').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-timer]');
+    if (b) toggleTimer(b.dataset.timer);
+  });
+
+  $('history').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-del]');
+    if (!b) return;
+    state.entries = state.entries.filter(x => x.id !== b.dataset.del);
+    save();
+    renderAll();
+  });
+
+  $('weeklyProgress').addEventListener('change', (e) => {
+    const k = e.target.dataset.goal;
+    if (!k) return;
+    const v = Math.round(Number(e.target.value));
+    if (v > 0) state.goals[k] = v; else delete state.goals[k];
+    save();
+    renderWeekly();
+  });
+
+  $('clearAll').addEventListener('click', () => {
+    if (!state.entries.length) return;
+    if (confirm('Delete all history? This cannot be undone.')) {
+      state.entries = [];
+      save();
+      renderAll();
+    }
+  });
+
+  // Manual form
+  $('mCat').innerHTML = KEYS.map(k => `<option value="${k}">${CATS[k].icon} ${CATS[k].label}</option>`).join('');
+  $('mDate').value = todayKey();
+  $('mDate').max = todayKey();
+
+  $('manualForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const cat = $('mCat').value;
+    const mins = Number($('mMin').value);
+    const date = $('mDate').value || todayKey();
+    if (!(mins > 0)) return;
+    addEntry(cat, mins * 60, date);
+    $('mMin').value = '';
+    $('formMsg').textContent = 'Added ' + mins + ' min of ' + CATS[cat].label.toLowerCase() + '.';
+    setTimeout(() => { $('formMsg').textContent = ''; }, 2500);
+    renderAll();
+  });
+
+  // Tick every second; refresh fully if the day rolls over; sync across tabs
+  let lastDay = todayKey();
+  setInterval(() => {
+    if (todayKey() !== lastDay) {
+      lastDay = todayKey();
+      $('mDate').max = lastDay;
+      renderAll();
+    } else {
+      updateLive();
+    }
+  }, 1000);
+
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORE) { state = load(); renderAll(); }
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
